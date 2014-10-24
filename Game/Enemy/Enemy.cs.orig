@@ -1,0 +1,212 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using Microsoft.Xna.Framework.Storage;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Graphics;
+
+
+using FarseerPhysics.Common;
+using FarseerPhysics.Factories;
+using FarseerPhysics.Collision;
+using FarseerPhysics;
+using FarseerPhysics.Dynamics;
+
+using System.IO;
+
+namespace gameProject
+{
+    //Add new name of enemy here
+    public enum EnemyName
+    {
+        Swing,
+        Wheel,
+        Smash,
+        FallDown,
+        DoubleSmash
+    }
+
+    
+
+    public abstract class Enemy : GameModel
+    {
+        public bool hasHit = false;
+        protected Player m_Receiver = null;
+
+        public string EnemyName;
+
+        public Enemy(Model model, Body body, TextureData textureData)
+            : base(string.Empty)
+        {
+            base.Name = "Enemy";
+            base.Model = model;
+            base.RigidBody = body;
+            base.RigidBody.OnCollision += RigidBody_OnCollision;
+            base.DiffuseTexture = textureData.Diffuse;
+            base.NormalTexture = textureData.Normal;
+            base.SpecularTexture = textureData.Specular;
+
+            EnemyName = "INSERT NAME";
+        }
+
+        public Enemy() 
+            : base(string.Empty)
+        {
+
+        }
+
+        public abstract void Create();
+        public virtual void Create(int direction)
+        {
+            //Used only for the smash enemy
+        }
+
+        private bool RigidBody_OnCollision(Fixture fixtureA, Fixture fixtureB, FarseerPhysics.Dynamics.Contacts.Contact contact)
+        {
+            var collider = (GameModel)fixtureB.Body.UserData;
+
+            //if (collider.Name == "Player")
+            //{
+            //    m_Receiver = (Player)collider;                
+            //    Console.WriteLine("Player hit enemy: " + EnemyName);
+            //    hasHit = true;
+            //}
+
+            return true;
+        }
+
+        public abstract void OnHit(); // behaviour when player hits the enemy
+    }
+
+    public class Wheel : Enemy
+    {
+
+        float m_Rotation = 0.0f;
+        public Wheel(Model model, Body body, TextureData textureData)
+            : base(model, body, textureData)
+        {
+            base.RigidBody.BodyType = BodyType.Static;
+            EnemyName = "Wheel";
+        }
+
+        public override void Create()
+        {
+
+        }
+
+        public override void Update(RenderContext context = null)
+        {
+            m_Rotation += 3.0f;
+            Rotate(0, m_Rotation, 0);
+
+            base.Update(context);
+        }
+
+        public override void OnHit()
+        {
+            m_Receiver.PickUpFromGround = true;
+            m_Receiver.PullDirection = 1;
+            hasHit = false;
+        }
+    }
+
+    public class Smash : Enemy
+    {        
+        public float m_Distance = 175 * 1.75f;
+        public int m_Direction = 1; 
+
+        Vector2 m_StartPos;
+        float m_SmashSpeed = 7.5f;
+        float m_Offset = 0f;
+        bool m_Return = false;
+
+        public Smash(Model model, Body body, TextureData textureData)
+            : base(model, body, textureData)
+        {
+            EnemyName = "Smash";
+            base.RigidBody.BodyType = BodyType.Static;
+            Name = "Smash";
+            Scale(0.5f, 0.5f, 0.5f);
+           
+        }
+
+        public override void Create()
+        {
+            //Nothing to do
+        }
+
+        public override void Create(int direction)
+        {
+            m_StartPos = Position;
+            m_Direction = direction;
+
+        }
+
+        public override void Update(RenderContext context)
+        {
+            m_Offset = Math.Abs(Position.Y - m_StartPos.Y);
+            if (m_Offset > m_Distance) m_Return = true;
+            if (m_Offset < 0.2f) m_Return = false;
+
+            Vector2 pos = Position;
+            if (!m_Return)
+                pos.Y += m_SmashSpeed * m_Direction;            
+            else
+                pos.Y -= (m_SmashSpeed / 3f) * m_Direction;
+            
+            Translate(pos);
+            base.Update();
+        }
+
+        
+        public override void OnHit()
+        {
+            m_Receiver.TakeHealth();
+            hasHit = false;
+        }
+    }
+
+    public class FallDown : Enemy
+    {
+        public float TriggerDistance = 300;
+
+
+        public FallDown(Model model, Body body, TextureData textureData)
+            : base(model, body, textureData)
+        {
+            EnemyName = "FallDown";
+            base.RigidBody.BodyType = BodyType.Static;
+            base.RigidBody.Mass = 3000;
+        }
+
+        public override void Create()
+        {
+        }
+
+        public override void Update(RenderContext context)
+        {
+            float playerX = context.Player.Position.X;
+            Vector2 pos = Position;
+
+            if (Math.Abs(pos.X - playerX) <= TriggerDistance)
+            {
+                RigidBody.BodyType = BodyType.Dynamic;
+                //Console.WriteLine("player near enemy, playerX = " + playerX);               
+            }
+
+            Translate(pos);
+
+            base.Update();
+        }
+
+
+        public override void OnHit()
+        {
+            m_Receiver.TakeHealth();
+            hasHit = false;
+        }
+    }
+}

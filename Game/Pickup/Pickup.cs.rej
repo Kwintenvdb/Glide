@@ -1,0 +1,24 @@
+--- GameProject/Game/Pickup/Pickup.cs	
++++ GameProject/Game/Pickup/Pickup.cs	
+@@ -142,21 +142,4 @@
+             RigidBody.Dispose();
+         }
+     }
+-    public class WindVulcano : Pickup
+-    {
+-        public WindVulcano(Model model, Body body, TextureData textureData)
+-            : base(model, body, textureData)
+-        {
+-            Rotate(0,0, 0);
+-            Scale(1.5f);
+-            RigidBody.UserData = this;
+ }
+-
+-        public override void OnPickup()
+-        {
+-            m_Receiver.IncreaseWind();
+-            Console.WriteLine("Push Vertical ");
+-            RigidBody.Dispose();
+-        }
+-    }
+-}

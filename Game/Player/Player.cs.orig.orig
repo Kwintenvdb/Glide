@@ -1,0 +1,455 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+
+using FarseerPhysics.Factories;
+using FarseerPhysics.Dynamics;
+
+
+namespace gameProject
+{
+    public class Player : GameModel
+    {
+        #region Variable Declaration
+
+        //Movement
+
+        float m_Rotation = 0f
+<<<<<<< local
+             ,m_RotationOld = 0f
+             ,m_TurnAmount = 3.0f
+             ,m_MaxXVelocity = 100.0f
+             ,m_CurrentVelo = 0f
+             ,m_Timer = 0.0f
+             ,m_resetHeight = 200f
+             ,m_FrictionMultiplier = 0.1f
+             ,m_DeltaTime = 0.0f;
+=======
+             , m_RotationOld = 0f
+             , m_TurnAmount = 3.0f
+             , m_MaxXVelocity = 100.0f
+             , m_CurrentVelo = 0f
+             , m_Timer = 0.0f
+             , m_resetHeight = 200f
+             , m_FrictionMultiplier = 0.1f
+             , m_DeltaTime = 0.0f;
+>>>>>>> other
+
+
+        Vector2 m_Direction = Vector2.Zero
+               , m_OrginalPos = Vector2.Zero
+               , m_PosOnHit = Vector2.Zero
+               , m_FrictionForce = Vector2.Zero;
+
+        Vector2 m_Velocity
+        {
+            get { return RigidBody.LinearVelocity; }
+            set { RigidBody.LinearVelocity = value; }
+        }
+
+        public HealthBar HealthBar;
+
+        //Wind
+        enum WindState { NoWind, BuildUp, BuildOff }
+        WindState m_WindState = WindState.NoWind;
+
+        float m_WindTime = 0f
+             , m_TwirlTime = 0f
+             , m_MaxTwirlTime = 30f
+             , m_TwirlDevider = 2.5f
+             , m_WindTimePause = 5f
+             , m_FinalWindForce = 0f
+             , m_CurrentWindForce = 0f
+             , m_Multplier = 1f
+             , m_CurrentIncrement = 0.05f
+             , m_MinHorizontalWind = 0f;
+
+        //Chain of Leaves
+        List<Chain> m_Chain = new List<Chain>();
+        int m_ChainCount = 4; //nr of leaves
+
+        bool m_bInput = true
+            , m_bPickedup = false
+            , m_TwirlEffect = true
+            , m_Twirl = false
+            , m_PickupFromGround = false;
+
+        Model m_Flat;
+        Model m_Curved;
+
+        #endregion Variable Declaration
+
+        public Player(RenderContext context, Vector2 originalPos)
+            : base("Player")
+        {
+            base.Name = "Player";
+            base.m_AssetFile = "Player";
+            m_OrginalPos = originalPos;
+            
+
+            //Create rigidBody      
+
+            Scale(0.25f);
+
+            RigidBody = BodyFactory.CreateRectangle(context.World, ConvertUnits.ToSimUnits(100), ConvertUnits.ToSimUnits(10), 1.0f);
+            RigidBody.BodyType = BodyType.Dynamic;
+            RigidBody.OnCollision += RigidBody_OnCollision;
+            RigidBody.OnSeparation += RigidBody_OnSeparation;
+            RigidBody.UserData = this; //Add this class as data for easy access in collision
+            RigidBody.Restitution = 0.1f;
+            RigidBody.FixedRotation = true;
+<<<<<<< local
+            Depth = -200;
+
+=======
+            Depth = 0;
+            
+<<<<<<< local
+=======
+>>>>>>> other
+>>>>>>> other
+            //chain
+
+            Body prevBody = RigidBody; //start at the player
+            Vector2 startAnchor = new Vector2(200, 0);
+            float scale = 1f;
+            Vector2 PiecePos = m_OrginalPos - new Vector2(50, 0);
+            for (int i = 0; i < m_ChainCount; i++)
+            {
+                Chain piece = new Chain(context, scale);
+                piece.Initialize(context);
+
+                piece.Translate(PiecePos);
+                m_Chain.Add(piece);
+                var jd = JointFactory.CreateDistanceJoint(context.World, prevBody, m_Chain[i].RigidBody);
+                jd.Length = 120f;
+                jd.DampingRatio = 10f;
+                jd.CollideConnected = false;
+                prevBody = m_Chain[i].RigidBody;
+                scale -= 0.2f;
+                PiecePos -= new Vector2(50, 0);
+            }
+
+            //Xml
+
+            var xmlPlayerData = XmlLoader.Load<PlayerSettings>("PlayerSettings");
+            m_Multplier = xmlPlayerData.multiplier;
+            m_TurnAmount = xmlPlayerData.turnAmount;
+            m_CurrentIncrement = xmlPlayerData.windIncrement;
+            m_TwirlEffect = xmlPlayerData.toggleTwirl;
+            if (xmlPlayerData.minWindSpeedX != -1) m_MinHorizontalWind = xmlPlayerData.minWindSpeedX;
+
+            m_Velocity = Vector2.Zero;
+
+<<<<<<< local
+            m_Flat = context.Content.Load<Model>("Model/Player");
+            m_Curved = context.Content.Load<Model>("Model/Player");
+=======
+<<<<<<< local
+=======
+            m_Flat = context.Content.Load<Model>("Model/m_playerStraight");
+            m_Curved = context.Content.Load<Model>("Model/m_playerCurved");
+>>>>>>> other
+           
+<<<<<<< local
+=======
+>>>>>>> other
+>>>>>>> other
+        }
+
+        //Collision
+        private void RigidBody_OnSeparation(Fixture fixtureA, Fixture fixtureB)
+        {
+        }
+
+        bool RigidBody_OnCollision(Fixture fixtureA, Fixture fixtureB, FarseerPhysics.Dynamics.Contacts.Contact contact)
+        {
+            var collider = (GameModel)fixtureB.Body.UserData;
+            if (collider != null && collider.Name == "Ground")
+            {
+
+                m_PosOnHit = Position;
+                m_PickupFromGround = true;
+
+            }
+
+            return true;
+        }
+
+        //Main update loop
+        public void Update(RenderContext context)
+        {
+            //Chains
+            m_RotationOld = m_Rotation;
+
+
+            if (m_ChainCount + 1 > HealthBar.m_Amount)
+            {
+                if (m_ChainCount > 0)
+                {
+<<<<<<< local
+                    m_ChainCount--;
+                    m_Chain.RemoveAt(m_Chain.Count - 1);
+=======
+                    //m_ChainCount--;
+                    //m_Chain.RemoveAt(m_Chain.Count - 1);
+>>>>>>> other
+                }
+            }
+
+            m_DeltaTime = (float)context.GameTime.ElapsedGameTime.Milliseconds / 100;
+
+            HandleInput();
+
+            HandlePickupTime();
+
+            if (m_bInput)
+            {
+                Movement(m_DeltaTime);
+            }
+            //still working on the friction
+            if (m_Velocity != Vector2.Zero)
+            {
+                Vector2 velocityNormalized = m_Velocity;
+                velocityNormalized.Normalize();
+                m_FrictionForce = m_FrictionMultiplier * (-velocityNormalized);
+
+                m_Velocity += m_FrictionForce;
+            }
+            RandomWind(m_DeltaTime);
+            if (m_TwirlEffect == true && m_Twirl == true) Twirl(m_DeltaTime);
+
+            Rotate(-m_Rotation, 90, m_Rotation);
+
+            //Clamp velocity to 60 by default
+            //Slow down/ speed up will change the clamping
+            m_CurrentVelo = m_Velocity.X;
+            MathHelp.Clamp(ref m_CurrentVelo, m_MaxXVelocity, -m_MaxXVelocity);
+            m_Velocity = new Vector2(m_CurrentVelo, m_Velocity.Y);
+
+            base.Update();
+            UpdateChains();
+        }
+
+        #region Pickup Boosts
+
+        void HandlePickupTime()
+        {
+            if (m_bPickedup == true)
+            {
+                m_Timer += m_DeltaTime;
+                if (m_Timer > 15.0f)
+                {
+                    m_Timer = 0;
+                    m_MaxXVelocity = 100;
+                    m_bPickedup = false;
+                    Console.WriteLine("Stop increase");
+                }
+            }
+
+        }
+
+        public void IncreaseSpeed()
+        {
+
+            m_MaxXVelocity = 150;
+            m_bPickedup = true;
+
+
+        }
+
+        public void DecreaseSpeed()
+        {
+            m_MaxXVelocity = 70;
+            m_bPickedup = true;
+        }
+
+        public void IncreaseWind()
+        {
+            Random rnd = new Random();
+            m_FinalWindForce = (float)(rnd.NextDouble() * 25) + 25f; //gives a good wind boost
+            m_WindState = WindState.BuildUp;
+
+        }
+
+        public float ReduceWind()
+        {
+            Random rnd = new Random();
+            float val = (float)(rnd.NextDouble() * 25.0) + 25f;
+            m_FinalWindForce -= val; //slows player down
+            m_Twirl = true;
+            return val;
+        }
+
+        #endregion Pickup Boosts
+
+        #region Input
+        void HandleInput()
+        {
+            var keyState = Keyboard.GetState();
+            var padState = GamePad.GetState(PlayerIndex.Two); //two for me(René) and one for everyone else
+
+            // See if GamePad is connected and use that
+<<<<<<< local
+
+            if (padState.IsConnected && (padState.ThumbSticks.Right.Y != 0f && padState.ThumbSticks.Right.X != 0f)) 
+=======
+            if (padState.IsConnected && (padState.ThumbSticks.Left.Y != 0f && padState.ThumbSticks.Left.X != 0f))
+>>>>>>> other
+            {
+<<<<<<< local
+                    m_Rotation = (float)Math.Atan2(padState.ThumbSticks.Right.Y, padState.ThumbSticks.Right.X);
+                    m_bInput = true;
+=======
+                float addedRotate = (float)Math.Atan2(padState.ThumbSticks.Left.Y, padState.ThumbSticks.Left.X) * 10;
+                m_Rotation += addedRotate;
+                m_bInput = true;
+>>>>>>> other
+            }
+            else
+            {
+                if (keyState.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.A))
+                {
+                    m_Rotation += m_TurnAmount;
+                    m_bInput = true;
+                    base.Model = m_Curved;
+                }
+
+                else if (keyState.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.D))
+                {
+                    m_Rotation -= m_TurnAmount;
+                    m_bInput = true;
+                    base.Model = m_Curved;
+                }
+                else
+                    base.Model = m_Flat;
+            }
+
+        }
+        #endregion
+
+        #region Movement
+        void Movement(float deltaTime)
+        {
+            var windVec = Wind();
+            windVec -= RigidBody.LinearVelocity;
+
+            var dot = windVec.X * (float)Math.Cos(RigidBody.Rotation + Math.PI / 2);
+            var sin = (float)Math.Sin(RigidBody.Rotation + Math.PI / 2);
+            dot += windVec.Y * (float)Math.Sin(RigidBody.Rotation + Math.PI / 2);
+            m_Velocity += m_Multplier * new Vector2(dot * (float)Math.Cos(RigidBody.Rotation + Math.PI / 2), dot * (float)Math.Sin(RigidBody.Rotation + Math.PI / 2));
+<<<<<<< local
+            
+=======
+
+>>>>>>> other
+        }
+<<<<<<< local
+        
+=======
+
+>>>>>>> other
+        void Twirl(float delta)
+        {
+            m_TwirlTime += delta;
+            if (m_TwirlTime > m_MaxTwirlTime)
+            {
+                m_Twirl = false;
+                m_TwirlTime = 0f;
+            }
+            else
+            {
+                //makes the leaf twirl less and less 
+                float twirlAmount = (m_MaxTwirlTime - (m_MaxTwirlTime * (m_TwirlTime / m_MaxTwirlTime))) / m_TwirlDevider;
+                m_Rotation += twirlAmount;
+            }
+        }
+
+        void RandomWind(float delta)
+        {
+            var xmlPlayerData = XmlLoader.Load<PlayerSettings>("PlayerSettings");
+            switch (m_WindState)
+            {
+                case WindState.NoWind:
+                    break;
+                case WindState.BuildUp:
+                    if (m_CurrentWindForce < m_FinalWindForce)
+                    {
+                        m_CurrentWindForce += m_CurrentIncrement;
+                    }
+                    else
+                        m_WindState = WindState.BuildOff;
+
+                    break;
+                case WindState.BuildOff:
+                    if (m_CurrentWindForce > m_MinHorizontalWind)
+                        m_CurrentWindForce -= m_CurrentIncrement;
+                    else
+                    {
+                        m_CurrentWindForce = m_MinHorizontalWind;
+                        m_WindState = WindState.NoWind;
+                    }
+                    break;
+            }
+
+        }
+
+        Vector2 Wind()
+        {
+            Vector2 wind;
+            if (!m_PickupFromGround)
+            {
+                wind = new Vector2(m_CurrentWindForce, -0.2f - 0.01f * (Position.Y / 50));
+
+                if (wind.Y > 15f) wind = new Vector2(wind.X, 15f); //capping the wind.Y between 15f and 4f
+                else if (wind.Y < 4f) wind = new Vector2(wind.X, 4f);
+            }
+            else
+            {
+                wind = new Vector2(0f, 100f);
+                if (m_PosOnHit.Y + m_resetHeight < Position.Y)
+                {
+                    HealthBar.RemoveHealth();
+                    m_PickupFromGround = false;
+                }
+
+            }
+
+
+
+
+            var xmlPlayerData = XmlLoader.Load<PlayerSettings>("PlayerSettings");
+            if (xmlPlayerData.windX != -1f) wind = new Vector2(xmlPlayerData.windX, wind.Y);
+            if (xmlPlayerData.windY != -1f) wind = new Vector2(wind.X, xmlPlayerData.windY);
+
+            return wind;
+        }
+
+        #endregion
+
+        public void DisplaySettings(RenderContext context)
+        {
+
+            TextRenderer.DrawText("Mulitplier: " + m_Multplier +
+                                    "\nTurn Amount: " + m_TurnAmount +
+                                    "\nIncrement: " + m_CurrentIncrement +
+                                    "\nVelocity: " + m_Velocity
+                                    , context.ViewPortSize.X * 0.75f, context.ViewPortSize.Y * 0.05f, Color.White, context);
+        }
+        public void UpdateChains()
+        {
+            foreach (Chain chain in m_Chain)
+                chain.Update(m_RotationOld, m_Velocity);
+        }
+        public void DrawChains(RenderContext renderContext)
+        {
+            foreach (Chain chain in m_Chain)
+                chain.Draw(renderContext);
+        }
+    }
+};

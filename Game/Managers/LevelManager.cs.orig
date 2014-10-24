@@ -1,0 +1,196 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using System.ComponentModel;
+
+using Microsoft.Xna.Framework;
+namespace gameProject
+{
+    //This class generates the level and uses multithreading and prefabs to generate the level dynamically without a considerable performance loss
+    class LevelManager
+    {      
+        RenderContext m_Context;
+        List<Level> m_Level = new List<Level>(); // List hat is generated based on all level Pieces
+        public bool m_bUpdate = true; 
+        float m_LevelOffset = 1.31f; //A Certain offset so the levels don't overlap
+
+        int m_LevelsToGenerate = 150; //How many levels to generate
+        
+        BackgroundWorker m_Worker;
+        bool m_bIsThreading = false;
+
+        public LevelManager()
+        {          
+
+        }
+
+        #region BackgroundThread functions
+        private void bgw_DoWork(object sender, DoWorkEventArgs e)
+        {            
+            //Run the Work Event
+             GenerateLevel((int)e.Argument, m_Context);
+             Console.WriteLine("Running Event");                       
+        }
+
+        private void m_Worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            if (e.Error != null)
+            {
+                Console.WriteLine("Error: " + e.Error.ToString());
+            }
+            else
+            {
+                //Work Completed Succesfully
+                Console.WriteLine("Close Thread");
+            }
+        }
+
+        public void Generate(int size, RenderContext context)
+        {
+            m_Context = context;
+
+            m_Worker = new BackgroundWorker();
+            
+            m_Worker.WorkerReportsProgress = true;
+            m_Worker.WorkerSupportsCancellation = true;
+            
+            m_Worker.DoWork += bgw_DoWork; //Work Event
+            m_Worker.RunWorkerCompleted += m_Worker_RunWorkerCompleted;
+
+            //Event that is run in the background;
+            Console.WriteLine("Opening new Thread");
+            m_Worker.RunWorkerAsync(size);
+
+            m_Worker.CancelAsync();
+
+            m_Worker.Dispose();
+
+        }
+        #endregion 
+
+        public void Initialize(RenderContext context)
+        {
+          var scaleX = 1.5f;
+          var scaleY = 1.2f;
+
+          //Add Possible Grounds to the list, if all the files have the correct namegiving everything should be loaded in
+          if (PiecePrefabList.Count == 0)
+          {
+              PiecePrefabList.AddPrefab(new PiecePrefab(context, Collision.Col1, "Piece1", scaleX, scaleY));
+              PiecePrefabList.AddPrefab(new PiecePrefab(context, Collision.Col2, "Piece2", scaleX, scaleY));
+              PiecePrefabList.AddPrefab(new PiecePrefab(context, Collision.Col3, "Piece4", scaleX, scaleY));
+              PiecePrefabList.AddPrefab(new PiecePrefab(context, Collision.Col4, "Piece6", scaleX, scaleY));
+              PiecePrefabList.AddPrefab(new PiecePrefab(context, Collision.Col5, "Piece8", -scaleX, scaleY));
+          }
+
+          //Fill Pickups
+          if (PickupPrefabList.Count == 0)
+          {
+              //Load All Possible Pickups here, models and name
+              PickupPrefabList.AddPrefab(new PickupPrefab(context, PickupName.Health, "PickupLeaf"));
+              PickupPrefabList.AddPrefab(new PickupPrefab(context, PickupName.SpeedUp, "PickupSpeed"));
+              PickupPrefabList.AddPrefab(new PickupPrefab(context, PickupName.SpeedDown, "PickupSpeed"));
+              PickupPrefabList.AddPrefab(new PickupPrefab(context, PickupName.WindUp, "PickupWind"));
+              PickupPrefabList.AddPrefab(new PickupPrefab(context, PickupName.WindDown, "PickupWind"));
+              PickupPrefabList.AddPrefab(new PickupPrefab(context, PickupName.WindVulcano, "WindVulcano"));
+          }
+
+          //Fill trees
+          if (TreePrefabList.Count == 0)
+          {
+              TreePrefabList.AddPrefab(new TreePrefab(context, TreeName.Tree1, "Tree1"));
+          }
+
+          //Fill Enemies
+          if (EnemyPrefabList.Count == 0)
+          {
+              //Load all Possible Pickups here, models and name
+              EnemyPrefabList.AddPrefab(new EnemyPrefab(context, EnemyName.Wheel, "EnemyRotator"));
+              EnemyPrefabList.AddPrefab(new EnemyPrefab(context, EnemyName.Smash, "SmashingWall"));
+              EnemyPrefabList.AddPrefab(new EnemyPrefab(context, EnemyName.FallDown, "Enemy1"));
+          }
+             
+            //always the same startpieces
+            m_Level.Add(new Level_0());
+            m_Level[0].Initialize(context);
+            GenerateLevel(m_LevelsToGenerate,context);                        
+        }
+
+        public void GenerateLevel(int size, RenderContext context)
+        {
+            //Don't generate when size < 0)
+            if (size <= 0)
+                return;
+
+             m_bIsThreading = true;
+
+            int index = m_Level.Count();
+            Level prev;
+            prev = m_Level[index - 1];
+            float time = 0;
+
+            for (int i = 0; i < size; ++i)
+            {
+                var level = new Level();
+
+                //this fills the level with random pieces and pickups/enemies
+                level.Initialize(context);
+
+                //Make them follow each other
+                level.Translate(new Vector2((prev.Position.X + (prev.Width * m_LevelOffset)), level.Position.Y));
+
+                //previous level is current level
+                prev = level;
+                index++;
+                time+=  context.GameTime.ElapsedGameTime.Seconds;
+                //Add it to the level
+                m_Level.Add((level));
+                //Console.WriteLine("Levels Generated : " + index + " in " + time + " Time");
+            }
+
+            //Done Generating
+
+            m_bIsThreading = false;
+        }
+
+        public void Update(RenderContext context)
+        {
+            foreach (Level level in m_Level.ToList<Level>())
+            {                
+                //Optimization so that only levels close to the player will be updated
+                if(Math.Abs(context.Player.Position.X - level.Position.X) < context.ViewPortSize.X * 4)
+                 level.Update(context,m_bIsThreading);
+            }            
+        }
+
+        //Draws all Levels in the list
+        public void Draw3D(RenderContext context)
+        {
+            foreach (Level level in m_Level.ToList<Level>())
+            {
+                if (Math.Abs(context.Player.Position.X - level.Position.X) < context.ViewPortSize.X * 4)
+                 level.Draw3D(context);
+            }
+        }
+        public void Draw2D(RenderContext context)
+        {
+            foreach (Level level in m_Level.ToList<Level>())
+            {
+                if (Math.Abs(context.Player.Position.X - level.Position.X) < context.ViewPortSize.X * 4)
+                    level.Draw2D(context);
+            }
+        }
+
+        public void ClearLevel()
+        {
+            foreach (Level level in m_Level.ToList<Level>())
+            {
+                level.Clear();
+            }
+            m_Level.Clear();
+        }
+       
+    }
+}

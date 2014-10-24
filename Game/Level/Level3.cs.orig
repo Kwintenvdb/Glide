@@ -1,0 +1,39 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+
+namespace gameProject
+{
+    class Level_3 : Level
+    {
+        public Level_3()
+            : base()
+        {
+
+        }
+
+        public override void Initialize(RenderContext context)
+        {
+            Piece ground = PiecePrefabList.GetPrefab(Collision.Col3, "Ground");
+            ground.Translate(0, -50);
+            AddChild(ground);
+
+            Piece Top = PiecePrefabList.GetPrefab(Collision.Col7, "Top");
+            Top.Rotate(0, 0, 180);
+            Top.Translate(1200, 350);
+            AddChild(Top);
+
+            Pickup pickup = GeneratePickup();
+            pickup.Translate(1100, 250);
+            AddChild(pickup);
+
+            Width = ground.Width;
+            base.Initialize(context);
+        }
+
+    }
+}

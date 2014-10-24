@@ -1,0 +1,40 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+
+namespace gameProject
+{
+    class Level_5 : Level
+    {
+        public Level_5()
+            : base()
+        {
+
+        }
+
+        public override void Initialize(RenderContext context)
+        {
+            Piece ground = PiecePrefabList.GetPrefab(Collision.Col2, "Ground");
+            ground.Translate(0, 0);
+            AddChild(ground);
+
+            Piece Top = PiecePrefabList.GetPrefab(Collision.Col8, "Top");
+            Top.Rotate(0, 0, 180);
+            Top.Translate(1200, 300);
+            AddChild(Top);
+
+            Enemy enemy = EnemyPrefabList.GetPrefab<Smash>(EnemyName.Smash);
+            enemy.Translate(850, 150);
+            enemy.Create(context);
+            AddChild(enemy);
+
+            Width = ground.Width;
+            base.Initialize(context);
+        }
+
+    }
+}
